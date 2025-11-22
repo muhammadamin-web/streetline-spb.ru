@@ -1,73 +1,58 @@
+// app/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
 export const runtime = 'edge';
 
-const FRAMER_URL = 'https://streentline.framer.website';
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const response = await fetch(FRAMER_URL, {
+    const response = await fetch('http://streetline-spb.ru', {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+        'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
+      },
     });
 
     if (!response.ok) {
-      return new Response('Failed to fetch', { status: response.status });
+      return new NextResponse('Upstream site error', { status: 502 });
     }
 
     let html = await response.text();
 
-    // Replace CDN URLs
-    html = html.replace(/https:\/\/framerusercontent\.com/g, '/cdn/framerusercontent.com');
-    html = html.replace(/https:\/\/ebb\.framer\.ai/g, '/cdn/ebb.framer.ai');
-    html = html.replace(/https:\/\/frames\.framer\.ai/g, '/cdn/frames.framer.ai');
-    html = html.replace(/https:\/\/cdn\.framer\.ai/g, '/cdn/cdn.framer.ai');
-    html = html.replace(/https:\/\/assets\.framer\.ai/g, '/cdn/assets.framer.ai');
+    // CDN URLlarini almashtiramiz
+    html = html.replace(/https:\/\/framerusercontent\.com\//g, '/cdn/framerusercontent.com/');
+    html = html.replace(/https:\/\/ebb\.framer\.ai\//g, '/cdn/ebb.framer.ai/');
+    html = html.replace(/https:\/\/frames\.framer\.ai\//g, '/cdn/frames.framer.ai/');
+    html = html.replace(/https:\/\/cdn\.framer\.ai\//g, '/cdn/cdn.framer.ai/');
+    
+    // Framer badgesini o'chiramiz
+    html = html.replace(/<!--\s*✨\s*Built with Framer.*?-->/g, '');
+    html = html.replace(/<div id="__framer-badge-container"[^>]*>.*?<\/div>/gi, '');
+    html = html.replace(/<meta[^>]*name="robots"[^>]*>/gi, '');
 
-    // Replace quoted URLs
-    html = html.replace(/"https:\/\/framerusercontent\.com/g, '"/cdn/framerusercontent.com');
-    html = html.replace(/"https:\/\/ebb\.framer\.ai/g, '"/cdn/ebb.framer.ai');
-    html = html.replace(/"https:\/\/frames\.framer\.ai/g, '"/cdn/frames.framer.ai');
-    html = html.replace(/"https:\/\/cdn\.framer\.ai/g, '"/cdn/cdn.framer.ai');
-    html = html.replace(/"https:\/\/assets\.framer\.ai/g, '"/cdn/assets.framer.ai');
-
-    // Replace CSS url() format
-    html = html.replace(/url\(https:\/\/framerusercontent\.com/g, 'url(/cdn/framerusercontent.com');
-    html = html.replace(/url\(https:\/\/ebb\.framer\.ai/g, 'url(/cdn/ebb.framer.ai');
-    html = html.replace(/url\(https:\/\/frames\.framer\.ai/g, 'url(/cdn/frames.framer.ai');
-    html = html.replace(/url\(https:\/\/cdn\.framer\.ai/g, 'url(/cdn/cdn.framer.ai');
-    html = html.replace(/url\(https:\/\/assets\.framer\.ai/g, 'url(/cdn/assets.framer.ai');
-
-    // Inject fetch interceptor for dynamic image loading
-    const fetchInterceptor = `
-    <script>
-    const originalFetch = window.fetch;
-    window.fetch = function(...args) {
-      let url = args[0];
-      if (typeof url === 'string') {
-        if (url.includes('framerusercontent.com')) url = url.replace('https://framerusercontent.com', '/cdn/framerusercontent.com');
-        if (url.includes('ebb.framer.ai')) url = url.replace('https://ebb.framer.ai', '/cdn/ebb.framer.ai');
-        if (url.includes('frames.framer.ai')) url = url.replace('https://frames.framer.ai', '/cdn/frames.framer.ai');
-        if (url.includes('cdn.framer.ai')) url = url.replace('https://cdn.framer.ai', '/cdn/cdn.framer.ai');
-        if (url.includes('assets.framer.ai')) url = url.replace('https://assets.framer.ai', '/cdn/assets.framer.ai');
-        args[0] = url;
-      }
-      return originalFetch.apply(this, args);
-    };
-    </script>
+    // Yandex Metrika qo'shamiz
+    const yandexMetrikaCode = `
+      <script type="text/javascript">
+        (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+        (window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");
+        ym(97023034,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});
+      </script>
+      <noscript><div><img src="https://mc.yandex.ru/watch/97023034" style="position:absolute;left:-9999px;" alt=""/></div></noscript>
     `;
+    
+    html = html.replace(/<\/head>/i, `${yandexMetrikaCode}</head>`);
 
-    html = html.replace('</head>', fetchInterceptor + '</head>');
-
-    return new Response(html, {
+    return new NextResponse(html, {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600',
-        'Access-Control-Allow-Origin': '*'
-      }
+        'Cache-Control': 'public, max-age=60',
+        'Access-Control-Allow-Origin': '*',
+      },
     });
-  } catch (error) {
-    console.error('Proxy error:', error);
-    return new Response('Proxy error', { status: 500 });
+  } catch (err) {
+    console.error('Error:', err);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
