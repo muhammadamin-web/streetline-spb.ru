@@ -1,6 +1,7 @@
 {
   "name": "streetline-spb-proxy",
   "version": "1.0.0",
+  "description": "Framer to cmdtech.uz proxy with Vercel Edge Functions",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,11 +13,10 @@
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
-      },
+  },
   "devDependencies": {
-    "typescript": "^5.0.0",
     "@types/node": "^20.0.0",
-    "@types/react": "^18.0.0"
-  
+    "@types/react": "^19.0.0",
+    "typescript": "^5.0.0"
   }
 }
