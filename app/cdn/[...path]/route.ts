@@ -1,71 +1,76 @@
+// app/cdn/[...path]/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
 export const runtime = 'edge';
 
-export async function GET(request: Request, { params }: any) {
+interface RouteContext {
+  params: Promise<{
+    path: string[];
+  }>;
+}
+
+export async function GET(
+  req: NextRequest,
+  context: RouteContext
+) {
   try {
-    const pathSegments = await Promise.resolve(params.path);
-    const domainWithPath = pathSegments?.join('/') || '';
+    const params = await context.params;
+    const pathSegments = params.path || [];
     
-    if (!domainWithPath) {
-      return new Response('Not found', { status: 404 });
+    if (pathSegments.length === 0) {
+      return new NextResponse('Invalid path', { status: 400 });
     }
 
-    const upstreamUrl = `https://${domainWithPath}`;
-    const response = await fetch(upstreamUrl, {
+    // Path formatini to'g'rilaymiz
+    // Misol: /cdn/framerusercontent.com/images/abc.png
+    const domain = pathSegments[0];
+    const resourcePath = pathSegments.slice(1).join('/');
+    
+    // To'liq URLni tuzamiz
+    const upstreamUrl = `https://${domain}/${resourcePath}`;
+    
+    // Query parametrlarini qo'shamiz (width, height, va h.k.)
+    const searchParams = req.nextUrl.searchParams.toString();
+    const fullUrl = searchParams ? `${upstreamUrl}?${searchParams}` : upstreamUrl;
+
+    console.log('Fetching:', fullUrl);
+
+    // Resourceni yuklaymiz
+    const response = await fetch(fullUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+        'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
+        'Referer': 'https://streentline.framer.website/',
+      },
     });
 
     if (!response.ok) {
-      return new Response('Failed to fetch resource', { status: response.status });
+      console.error('Fetch failed:', response.status, fullUrl);
+      return new NextResponse('Resource not found', { status: response.status });
     }
 
+    // Content type olish
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
-    const data = await response.arrayBuffer();
+    
+    // Responseni ArrayBuffer sifatida olamiz
+    const buffer = await response.arrayBuffer();
 
-    return new Response(data, {
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',
-        'Access-Control-Allow-Origin': '*'
-      }
+        'Access-Control-Allow-Origin': '*',
+      },
     });
-  } catch (error) {
-    console.error('CDN proxy error:', error);
-    return new Response('CDN proxy error', { status: 500 });
+  } catch (err) {
+    console.error('Proxy error:', err);
+    return new NextResponse(`Proxy error: ${err}`, { status: 500 });
   }
 }
 
-export async function HEAD(request: Request, { params }: any) {
-  try {
-    const pathSegments = await Promise.resolve(params.path);
-    const domainWithPath = pathSegments?.join('/') || '';
-    
-    if (!domainWithPath) {
-      return new Response('Not found', { status: 404 });
-    }
-
-    const upstreamUrl = `https://${domainWithPath}`;
-    const response = await fetch(upstreamUrl, {
-      method: 'HEAD',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-
-    const contentType = response.headers.get('content-type') || 'application/octet-stream';
-
-    return new Response(null, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
-  } catch (error) {
-    console.error('CDN proxy HEAD error:', error);
-    return new Response('CDN proxy error', { status: 500 });
-  }
+export async function HEAD(
+  req: NextRequest,
+  context: RouteContext
+) {
+  return GET(req, context);
 }
