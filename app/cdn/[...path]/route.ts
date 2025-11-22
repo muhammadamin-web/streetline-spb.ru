@@ -1,10 +1,7 @@
 export const runtime = 'edge';
 
-interface Params {
-  path: string[];
-}
-
-export async function GET(request: Request, { params }: any) {  try {
+export async function GET(request: Request, { params }: any) {
+  try {
     const pathSegments = await Promise.resolve(params.path);
     const domainWithPath = pathSegments?.join('/') || '';
     
@@ -12,10 +9,7 @@ export async function GET(request: Request, { params }: any) {  try {
       return new Response('Not found', { status: 404 });
     }
 
-    // Reconstruct the full URL
     const upstreamUrl = `https://${domainWithPath}`;
-
-    // Fetch the resource
     const response = await fetch(upstreamUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -43,11 +37,12 @@ export async function GET(request: Request, { params }: any) {  try {
   }
 }
 
-export async function HEAD(request: Request, { params }: { params: Params }) {
+export async function HEAD(request: Request, { params }: any) {
   try {
     const pathSegments = await Promise.resolve(params.path);
     const domainWithPath = pathSegments?.join('/') || '';
-export async function HEAD(request: Request, { params }: any) {    if (!domainWithPath) {
+    
+    if (!domainWithPath) {
       return new Response('Not found', { status: 404 });
     }
 
