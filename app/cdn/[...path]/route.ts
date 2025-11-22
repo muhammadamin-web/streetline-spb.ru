@@ -4,8 +4,7 @@ interface Params {
   path: string[];
 }
 
-export async function GET(request: Request, { params }: { params: Params }) {
-  try {
+export async function GET(request: Request, { params }: any) {  try {
     const pathSegments = await Promise.resolve(params.path);
     const domainWithPath = pathSegments?.join('/') || '';
     
@@ -48,8 +47,7 @@ export async function HEAD(request: Request, { params }: { params: Params }) {
   try {
     const pathSegments = await Promise.resolve(params.path);
     const domainWithPath = pathSegments?.join('/') || '';
-    
-    if (!domainWithPath) {
+export async function HEAD(request: Request, { params }: any) {    if (!domainWithPath) {
       return new Response('Not found', { status: 404 });
     }
 
