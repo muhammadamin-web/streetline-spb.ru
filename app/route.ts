@@ -5,7 +5,7 @@ export const runtime = 'edge';
 
 export async function GET(req: NextRequest) {
   try {
-    const response = await fetch('http://streetline-spb.ru', {
+    const response = await fetch('https://streentline.framer.website/', {
       headers: {
         'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
       },
