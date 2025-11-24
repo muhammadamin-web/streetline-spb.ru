@@ -30,6 +30,9 @@ export async function GET(req: NextRequest) {
 
     // Yandex Metrika qo'shamiz
     const yandexMetrikaCode = `
+    <!-- Proxied by Cloudflare Worker -->
+      <script>console.log('🔄 Vercel Worker Active');</script>
+      
       <script type="text/javascript">
         (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
         m[i].l=1*new Date();
