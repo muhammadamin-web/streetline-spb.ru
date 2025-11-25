@@ -7,32 +7,35 @@ interface RouteContext {
   params: Promise<{ path: string[] }>;
 }
 
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 8000) {
+  return Promise.race([
+    fetch(url, options),
+    new Promise<Response>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), timeout)
+    ),
+  ]) as Promise<Response>;
+}
+
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const params = await context.params;
     const pathSegments = params.path || [];
-
     if (pathSegments.length === 0) return new NextResponse('Invalid path', { status: 400 });
 
     const domain = pathSegments[0];
     const resourcePath = pathSegments.slice(1).join('/');
     const upstreamUrl = `https://${domain}/${resourcePath}`;
-
     const searchParams = req.nextUrl.searchParams.toString();
     const fullUrl = searchParams ? `${upstreamUrl}?${searchParams}` : upstreamUrl;
 
-    // Fetch with timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000); // 15s
-    const response = await fetch(fullUrl, {
+    console.log('Proxy fetch:', fullUrl);
+
+    const response = await fetchWithTimeout(fullUrl, {
       headers: {
         'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
         'Referer': 'https://streentline.framer.website/',
-        'Accept': '*/*',
       },
-      signal: controller.signal,
     });
-    clearTimeout(timeout);
 
     if (!response.ok) return new NextResponse('Resource not found', { status: response.status });
 
@@ -48,7 +51,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       },
     });
   } catch (err) {
-    console.error('Proxy Error:', err);
+    console.error('Proxy error:', err);
     return new NextResponse(`Proxy error: ${err}`, { status: 500 });
   }
 }
