@@ -4,54 +4,39 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'edge';
 
 interface RouteContext {
-  params: Promise<{
-    path: string[];
-  }>;
+  params: Promise<{ path: string[] }>;
 }
 
-export async function GET(
-  req: NextRequest,
-  context: RouteContext
-) {
+export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const params = await context.params;
     const pathSegments = params.path || [];
-    
-    if (pathSegments.length === 0) {
-      return new NextResponse('Invalid path', { status: 400 });
-    }
 
-    // Path formatini to'g'rilaymiz
-    // Misol: /cdn/framerusercontent.com/images/abc.png
+    if (pathSegments.length === 0) return new NextResponse('Invalid path', { status: 400 });
+
     const domain = pathSegments[0];
     const resourcePath = pathSegments.slice(1).join('/');
-    
-    // To'liq URLni tuzamiz
     const upstreamUrl = `https://${domain}/${resourcePath}`;
-    
-    // Query parametrlarini qo'shamiz (width, height, va h.k.)
+
     const searchParams = req.nextUrl.searchParams.toString();
     const fullUrl = searchParams ? `${upstreamUrl}?${searchParams}` : upstreamUrl;
 
-    console.log('Fetching:', fullUrl);
-
-    // Resourceni yuklaymiz
+    // Fetch with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s
     const response = await fetch(fullUrl, {
       headers: {
         'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
         'Referer': 'https://streentline.framer.website/',
+        'Accept': '*/*',
       },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
-    if (!response.ok) {
-      console.error('Fetch failed:', response.status, fullUrl);
-      return new NextResponse('Resource not found', { status: response.status });
-    }
+    if (!response.ok) return new NextResponse('Resource not found', { status: response.status });
 
-    // Content type olish
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
-    
-    // Responseni ArrayBuffer sifatida olamiz
     const buffer = await response.arrayBuffer();
 
     return new NextResponse(buffer, {
@@ -63,14 +48,11 @@ export async function GET(
       },
     });
   } catch (err) {
-    console.error('Proxy error:', err);
+    console.error('Proxy Error:', err);
     return new NextResponse(`Proxy error: ${err}`, { status: 500 });
   }
 }
 
-export async function HEAD(
-  req: NextRequest,
-  context: RouteContext
-) {
+export async function HEAD(req: NextRequest, context: RouteContext) {
   return GET(req, context);
 }
