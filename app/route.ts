@@ -3,13 +3,24 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
+const FRAMER_URL = 'https://streentline.framer.website/';
+
 export async function GET(req: NextRequest) {
   try {
-    const response = await fetch('https://streentline.framer.website/', {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+    const response = await fetch(FRAMER_URL, {
       headers: {
         'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0',
+        'Referer': FRAMER_URL,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       return new NextResponse('Upstream site error', { status: 502 });
@@ -17,22 +28,22 @@ export async function GET(req: NextRequest) {
 
     let html = await response.text();
 
-    // CDN URLlarini almashtiramiz
+    // CDN URLlarini almashtirish
     html = html.replace(/https:\/\/framerusercontent\.com\//g, '/cdn/framerusercontent.com/');
+    html = html.replace(/https:\/\/uploads\.framerusercontent\.com\//g, '/cdn/uploads.framerusercontent.com/');
     html = html.replace(/https:\/\/ebb\.framer\.ai\//g, '/cdn/ebb.framer.ai/');
     html = html.replace(/https:\/\/frames\.framer\.ai\//g, '/cdn/frames.framer.ai/');
     html = html.replace(/https:\/\/cdn\.framer\.ai\//g, '/cdn/cdn.framer.ai/');
-    
-    // Framer badgesini o'chiramiz
+    html = html.replace(/https:\/\/api\.framer\.ai\//g, '/cdn/api.framer.ai/');
+
+    // Framer badgesini o'chirish
     html = html.replace(/<!--\s*✨\s*Built with Framer.*?-->/g, '');
     html = html.replace(/<div id="__framer-badge-container"[^>]*>.*?<\/div>/gi, '');
     html = html.replace(/<meta[^>]*name="robots"[^>]*>/gi, '');
 
-    // Yandex Metrika qo'shamiz
+    // Yandex Metrika qo‘shish (misol)
     const yandexMetrikaCode = `
-    <!-- Proxied by Cloudflare Worker -->
-      <script>console.log('🔄 Vercel Worker Active');</script>
-      
+      <script>console.log('🔄 Vercel Proxy Active');</script>
       <script type="text/javascript">
         (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
         m[i].l=1*new Date();
@@ -43,19 +54,19 @@ export async function GET(req: NextRequest) {
       </script>
       <noscript><div><img src="https://mc.yandex.ru/watch/97023034" style="position:absolute;left:-9999px;" alt=""/></div></noscript>
     `;
-    
     html = html.replace(/<\/head>/i, `${yandexMetrikaCode}</head>`);
 
     return new NextResponse(html, {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=60',
+        'Cache-Control': 'public, max-age=600', // 10 min caching
         'Access-Control-Allow-Origin': '*',
       },
     });
+
   } catch (err) {
-    console.error('Error:', err);
+    console.error('Proxy Error:', err);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
